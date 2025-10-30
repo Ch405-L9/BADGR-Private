@@ -1,0 +1,11 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 1,
+      "output": ["json","html"],
+      "outputPath": ".lighthouseci"
+    },
+    "assert": { "assertions": {} },
+    "upload": { "target": "filesystem", "outputDir": ".lighthouseci" }
+  }
+}
