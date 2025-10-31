@@ -1,5 +1,0 @@
-{
-  "settings": {
-    "skipAudits": ["interaction-to-next-paint"]
-  }
-}
