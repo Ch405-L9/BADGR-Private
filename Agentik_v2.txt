@@ -1,0 +1,139 @@
+Deep Dive: Using Open B2B Data Sources for Company Data Enrichment
+Introduction
+
+This report explores how to enrich company data using public B2B datasets and tools – specifically OpenSanctions, Clearbit’s free data APIs, open Crunchbase dataset clones, and the Upgini library. The goal is to leverage free and open data to gather valuable information about companies (and related persons) without expensive licenses or API keys. By rotating through multiple free sources (and their freemium quotas), we can maximize data coverage at no cost (point 1). We also outline ethical guidelines to include only business-relevant personal data (point 2) and our initial focus on Internet of Things (IoT) companies in Georgia (GA) as a starting region (point 3). All recommended datasets (point 4) and methods are detailed below, with an emphasis on readability and a logical flow.
+
+Key Public Datasets and Tools for B2B Enrichment
+OpenSanctions (Sanctions & PEP Dataset)
+
+OpenSanctions is an open-source aggregated database of individuals and companies of interest from international sanctions lists, politically exposed persons (PEPs), and similar watchlists
+github.com
+. It compiles data from many official sources, standardizes it, and deduplicates entries. This dataset is invaluable for compliance checks and risk analysis – e.g. flagging if a company or its executives appear on sanctions or crime watchlists. OpenSanctions uses the FollowTheMoney data model and even links entities to external databases like OpenCorporates (the global company registry) for enrichment
+github.com
+. In practice, we can use OpenSanctions by downloading their consolidated CSV/JSON data or via their API (called Yente for entity matching). This allows us to input a company or person’s name and see if there’s a match in the sanctions/PEP lists. Using OpenSanctions in our pipeline: for each company, we will cross-check its name (and key persons, if known) against OpenSanctions to retrieve any risk flags or related entities. This data is open and free to use (for non-commercial purposes, CC BY-NC license)
+github.com
+, fitting our cost-free requirement. It provides an important layer of due diligence that typical company databases might not include.
+
+Clearbit Free APIs (Company Autocomplete & Logo)
+
+Clearbit is a well-known B2B data provider, and while most of its enrichment products are paid, it historically offered some free tools that we can leverage. Notably:
+
+Logo API – a simple HTTP API that returns a company’s logo given its domain. For example, a request to https://logo.clearbit.com/buzzsumo.com returns BuzzSumo’s logo image
+clearbit.com
+. This requires no API key or signup and provides instant visual branding for each company. It’s extremely easy to use (“zero friction – immediate benefit” as Clearbit notes
+clearbit.com
+).
+
+Autocomplete API – an API that given a partial company name, returns the full company name, domain, and logo in real time
+clearbit.com
+. This can be used to standardize company names and find domains. For instance, typing a partial name like "Glob" could return "Globex Corporation – globex.com – logo". This is useful if our data is missing official names or URLs. Clearbit’s own description says that from just a fragment, the Autocomplete API can reliably supply the correct company data instantly
+clearbit.com
+.
+
+However, we must note recent changes: Clearbit has announced it is sunsetting these free services. As of Sept 2025, the Autocomplete API no longer returns logo images, and by Dec 1, 2025 the public Logo API will be completely shut down
+clearbit.com
+. This means we will need to pivot to alternatives for logo and company lookup in the near future. Clearbit itself recommends Logo.dev as an alternative for free logos
+clearbit.com
+. Logo.dev or similar services can fill the gap of retrieving company logos by domain. Despite these changes, in the immediate term we can utilize Clearbit’s tools (if still operational for us) to grab any missing domains or logos without cost. We will implement a fallback sequence: try Clearbit’s API (while available) and automatically switch to an alternative like Logo.dev once Clearbit’s free service sunsets. The Clearbit Autocomplete and similar services often have freemium limits (e.g. ~60 requests/minute as a rate limit
+community.openai.com
+), but since we only need occasional lookups (and can cache results), this is manageable within free allowances.
+
+Crunchbase Open Data (and Clones)
+
+Crunchbase is a premier source for company profiles, funding information, and industry categories. While the current Crunchbase API is paid and access-restricted, we can rely on the open datasets and community clones derived from Crunchbase’s earlier open data. In the past, Crunchbase openly provided a comprehensive startup/company dataset (often referred to as “Open Crunchbase”), which has been archived by various third parties. For example, a Kaggle dataset notes that “This database is open-sourced by Crunchbase”
+kaggle.com
+ – indicating a public release of Crunchbase data that enthusiasts can use. Although Crunchbase stopped its open dumps around 2017, those snapshots (and periodically scraped updates) are still available. We will leverage these free clones of Crunchbase data to extract firmographic details: company industry tags, descriptions, founding dates, locations, employee counts, funding rounds, etc.
+
+Concretely, our plan is to obtain an open Crunchbase dataset (such as a CSV from Kaggle or an BigQuery public dataset) and query it for relevant information. This gives us a broad index of companies which we can filter by criteria like industry or region. For example, Crunchbase data can be filtered by location (e.g. state = Georgia) and category (e.g. contains "IoT") to list all IoT companies in Georgia – Crunchbase’s own analysis has shown the value of slicing data by geography
+news.crunchbase.com
+. We’ll use such queries to generate our initial target list of companies. While the data might not be fully up-to-date, it’s a solid starting point we can later augment with real-time info.
+
+Additionally, we can incorporate OpenCorporates data as a complement to Crunchbase. OpenCorporates is the world’s largest open database of companies, with over 200 million legal entities from 140+ jurisdictions
+veridion.com
+. It provides official registry information (registered addresses, directors/officers, incorporation dates, etc.). This kind of data can enrich our knowledge about each company’s legal status and identifiers. OpenCorporates has a free API for reasonable usage, and it’s integrated with OpenSanctions (so a company match in OpenSanctions often yields its OpenCorporates ID). Using OpenCorporates alongside Crunchbase info means we cover both business profile (Crunchbase-style) and legal registration details for each company, all from open sources.
+
+Upgini Library (Automated Data Enrichment)
+
+Upgini is a Python library that acts as an intelligent data search and enrichment engine, aggregating hundreds of external data sources. Importantly, Upgini allows us to enrich our dataset without individually querying each source or managing API keys – it handles the heavy lifting. Upgini scans through public, community, and premium datasets and finds relevant features for the entities (rows) we provide
+github.com
+. In our context, if we supply a list of companies (with whatever identifying info we have, such as name, domain, location, etc.), Upgini can automatically look up additional attributes from its connected sources. This could include things like industry classifications, number of employees, revenue estimates, web traffic metrics, and even social media or web presence data, depending on what’s available openly.
+
+One major advantage of Upgini is that it covers many open data sources internally, so for many enrichments no external API key is required on our part
+github.com
+. The library is designed for machine learning feature enrichment, which means it not only fetches data but also evaluates which features actually add new information. For example, Upgini has access to datasets such as: historical weather, macroeconomic indicators, demographics, internet usage stats, etc., all keyed by things like date and location – and all these have “API Key required: No” when used through Upgini
+github.com
+. It also can use keys like email, phone, or IP to pull profile data (those might tap into premium sources requiring keys, but we will stick to the free ones). Notably, Upgini will auto-augment keys – if our data is missing a piece needed to search a source, it tries to infer it. For instance, if we have a company’s domain but not its country, Upgini might deduce the country or find it from another source to use in further searches
+github.com
+. This cascading enrichment is very powerful for our use case.
+
+In summary, we will use Upgini to unify and automate the enrichment process: rather than writing separate integrations for OpenCorporates, sanction lists, etc., we pass our dataset to Upgini and let it return a set of new features/columns. Those features could include flags like “is_sanctioned”, “industry_sector”, “employee_count_estimate”, “annual_revenue_estimate”, “social_presence_score”, etc., depending on what Upgini finds relevant and available from open sources. This approach significantly speeds up data gathering, eliminating weeks of manual sourcing
+github.com
+. We will carefully review which features Upgini adds and ensure they align with our needs (since it’s geared for ML, some features might be more prediction-oriented). Overall, Upgini provides a key advantage in working without API keys while tapping into a broad swath of public data.
+
+Strategy: Rotating Free Services to Maximize Coverage
+
+To adhere to a zero-cost model, we will rotate through free tiers and datasets (point 1) in our workflow. Each data source often has limits on free usage, but by combining multiple sources, we can avoid hitting a wall. For example:
+
+We’ll use the open datasets (Crunchbase clone, OpenSanctions, OpenCorporates) for bulk information that can be downloaded once and queried locally – no limits on our end once we have the data. This covers static or slow-changing info (company profiles, sanctions lists, registrations, etc.).
+
+For APIs with freemium limits (like Clearbit’s Autocomplete or any other enrichment API we try), we will design our pipeline to stay within the free allowance. If Clearbit allows (hypothetically) a certain number of lookups per week for free, we’ll spread our queries over time or create a rotating pool of services. For instance, Clearbit’s Autocomplete might handle the first batch of company lookups; if we exceed its free quota or if it’s not available, we can switch to another free service or dataset for similar data (such as querying our Crunchbase local data for domains, or using Upgini to fetch missing domains). The idea is to fail-over between services such that the next free option picks up when one is exhausted.
+
+We will also take advantage of caching. Many company data points (e.g. a domain or logo for a given company) only need to be fetched once. We’ll store results so that we don’t repeat API calls for the same entity. This conserves our limited free API calls for new queries only.
+
+By orchestrating these rotations and caches, we ensure that “absolutely free lookups” are used whenever possible, and any freemium service is utilized only up to its free limit. This strategy lets us cycle through multiple providers to cover more ground. For example, if provider A gives 100 free lookups/month and provider B gives another 100, using them in tandem effectively doubles our capacity for that month without incurring cost. In essence, a clever scheduling of requests and use of multiple data sources will give us the benefits of a composite “virtual API” that stays free. We will document which services are used for which fields and have monitors to avoid crossing into paid usage inadvertently.
+
+Ethical Use of Personal & Business Data
+
+We are committed to using data ethically and legally. Our focus is on business-related information, but sometimes that includes personal data (e.g. names of founders, executives, professional contact info). We will only gather personal data that is directly tied to the company’s public profile or operations (point 2). For instance, it’s useful to know the CEO’s name or a founder’s LinkedIn if publicly available, as this is part of the business context. However, we will not engage in any unethical hacking or intrusive scraping of personal information. All data sources we use are open-source or provided via official free APIs, ensuring we respect terms of service and privacy regulations.
+
+Concretely, this means: no breach of privacy laws (like GDPR/CCPA) – we won’t collect personal emails or phone numbers without consent, and no data from illegitimate sources. If Upgini or any dataset offers personal attributes, we will filter to keep only what’s relevant for B2B use (for example, job titles of key people might be relevant, but home addresses or unrelated personal social media would not be). We also heed usage licenses: OpenSanctions data is non-commercial unless licensed, so if our project turns commercial, we’d pursue the proper license or restrict that data. The guiding principle is transparency and relevance: use data that a company or individual has made public in a business context, and avoid anything covert. This ethical stance not only avoids legal trouble, but also ensures data quality – reputable open data tends to be maintained and accurate, whereas shady sources could be unreliable.
+
+Finally, we will include an opt-out mechanism in case any data subject requests removal (especially pertinent if we build a product on this). Being proactive about ethics will build trust in our B2B data solution and prevent issues down the line.
+
+Initial Focus: IoT Companies in Georgia (GA) by Region
+
+For our pilot implementation, we will start with IoT (Internet of Things) companies in Georgia (point 3). This means our first dataset extraction will target all companies in the IoT sector that are based in the region of Georgia. We interpret "GA" as the U.S. state of Georgia (which has a growing tech scene, including Atlanta), and “ALL of IoT by regions” as an approach to eventually cover all regions, one at a time, for IoT companies. Georgia will serve as a testbed region to refine our methods before scaling up.
+
+How we will gather GA IoT companies: Using the Crunchbase open dataset (or a similar source), we will filter for companies that have Internet of Things as an industry/category and have their headquarters or address in Georgia. Crunchbase data typically contains fields like category_list (which might include "Internet of Things" or related keywords) and location fields (city, state, country). By running a query on the dataset (e.g., SQL or pandas filters), we can isolate all entries meeting those criteria. This should give us a list of companies – ideally including startup, SMB, and enterprise level – that operate in IoT and are in GA. Early research suggests that North America (including GA) hosts a significant portion of IoT startups
+iot-analytics.com
+, so we expect dozens if not hundreds of companies from this query.
+
+We will then take that list and apply the enrichment process described: for each company, gather additional details (domain, description, founding date, etc. from Crunchbase data), fetch logos (via Clearbit/alternative), check sanctions (OpenSanctions lookup), get official registration info (OpenCorporates), and see if Upgini can add further features (like whether the company is mentioned in other open data). The result will be a rich profile for each IoT company in Georgia, including both factual data and any risk flags or notable signals.
+
+This regional IoT focus not only helps us validate our pipeline on a manageable subset, but also produces a useful dataset in its own right – for example, an investor or economic developer might be very interested in a comprehensive view of Georgia’s IoT sector as of 2025. Once we perfect this process for GA, we plan to expand region by region (e.g., next might be IoT companies in California, then Northeast US, or even other countries/regions with IoT hubs) until we have global coverage of IoT companies. The modular design (data sources and Upgini enrichment) will make it relatively easy to change the location filter and rerun. We can also later broaden beyond IoT to other industries, but IoT is our starting vertical.
+
+Conclusion and Recommendations
+
+In summary, we will leverage a combination of open datasets and free APIs to enrich company information without incurring costs. The plan involves using OpenSanctions for compliance data, Clearbit’s (historically) free tools for quick company info (with alternatives lined up as Clearbit’s free services phase out), Crunchbase-open data (and similar) for core company info, and the Upgini library to tie everything together and inject additional open-source features. By rotating through these resources’ free allowances and carefully caching results, we ensure maximum output under free tiers. We will maintain ethical standards by focusing on public business data and avoiding invasive techniques. The initial implementation targeting Georgia’s IoT companies will serve as a proving ground for our approach, yielding a rich regional dataset and paving the way for scaling to more regions and sectors.
+
+With this strategy, we expect to build a robust B2B data enrichment pipeline that is comprehensive, up-to-date, and cost-effective. All the datasets mentioned (point 4) will indeed be utilized as planned. As next steps, we should obtain the required data files (Crunchbase snapshot, OpenSanctions list, etc.), set up the Upgini environment (already in requirements, just needs API initialization which is free), and start enriching a sample of companies to evaluate the results. If any gaps are identified (for example, if a particular data point is missing consistently), we can consider adding another free source to fill it. Overall, the recommendation is to proceed with this open-data-driven approach, which aligns well with our goals of zero-cost and high coverage. By continuously refining the rotation of sources and staying aware of policy changes (like the Clearbit API update), we can keep this solution sustainable and scalable.
+
+Sources:
+
+OpenSanctions documentation (open-source sanctions & PEP database)
+github.com
+github.com
+
+Clearbit blog – free Logo and Autocomplete API usage
+clearbit.com
+clearbit.com
+
+Clearbit announcements on logo API deprecation (2025)
+clearbit.com
+clearbit.com
+
+Community Crunchbase open dataset (Kaggle description)
+kaggle.com
+
+OpenCorporates open company data (200M+ companies)
+veridion.com
+
+Upgini official docs (feature search across public data, no API keys needed for many sources)
+github.com
+github.com
+
+Crunchbase News (value of location-based company data analysis)
+news.crunchbase.com
+
+IoT startup landscape (regional distribution insight)
+iot-analytics.com
