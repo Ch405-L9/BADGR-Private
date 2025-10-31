@@ -1,0 +1,202 @@
+Automated Lead-Gen and Audit Pipeline Blueprint (Utilizing AI)
+Phase 1: Lead Discovery
+
+Keyword-Based Search: Use pain-point keywords to find relevant companies. For example, leverage a DuckDuckGo or Searx-based Python search (e.g. duckduckgo-search library) to query terms related to target customers’ problems.
+
+Extract Leads: Parse search results to identify company names, domains, and context snippets. Seed a domains.txt list with each unique domain (strip out freemail providers like Gmail, Outlook, ProtonMail, etc.). Use a script (like the existing email_to_urls.sh) to convert raw lead lists into valid business URLs (only include domains with DNS resolution).
+
+Store Contacts: Optionally scrape contact pages (using Playwright + BeautifulSoup) of the discovered domains to collect email addresses or contact forms. This ensures each lead has at least one point of contact for outreach.
+
+Phase 2: Data Enrichment
+
+Firmographic Enrichment: For each discovered company/domain, enrich missing data using available tools. Use the Upgini API (already installed) to fetch company details or lead scoring features. (Upgini “can score leads and detect which lead is fake”
+upgini.com
+, which helps prioritize quality leads.)
+
+Open Data Sources: Query open databases to fill gaps: use OpenSanctions to check company sanction or watchlist status, Clearbit (open API) for additional firmographics (size, industry), and a Crunchbase open dataset for funding or industry info. Rotate between free-tier sources to avoid rate limits.
+
+Merge Results: Store all enriched attributes in a structured store (e.g. a local SQLite database). Include fields like industry, headcount, funding, etc. Mark leads as low/high quality or priority based on enrichment (e.g. flag duplicate or fake leads, missing critical info, etc.).
+
+Phase 3: Website Audit & Scoring
+
+Automated Audits: Run Lighthouse audits on each target domain. The provided run.sh script already loops through configs/domains.txt, invoking Lighthouse via Node (or npx lighthouse) in headless mode. This generates JSON and HTML reports for performance, accessibility, SEO, and best practices. Lighthouse is “an open-source, automated tool to help you improve the quality of web pages” with audits for performance, accessibility, SEO, and more
+developer.chrome.com
+.
+
+Extract Metrics: Use the existing main.py to parse JSON reports into a CSV (or database). Key metrics to capture include Core Web Vitals (Largest Contentful Paint, Cumulative Layout Shift, Interaction to Next Paint) and category scores (Performance, SEO, Best Practices, Accessibility). Store these in outputs/csv/results.csv.
+
+Score and Prioritize: Combine audit results with enrichment data. For example, compute a composite “score” for each lead by weighting poor Lighthouse scores higher (indicating more pain/opportunity). Use Pandas to aggregate and sort leads. Shortlist leads whose sites show major performance or SEO issues (these are pain points your service can solve).
+
+Phase 4: Outreach Automation
+
+Message Generation: Write personalized outreach emails for each shortlisted lead. You can use templates or an LLM to craft messages that reference the lead’s pain points (e.g. “We noticed your site’s mobile speed is low (LCP = ...), which may affect user retention. Our team specializes in Web Vitals optimization…”). Pull in company name and specific audit findings for customization.
+
+Queue Sending: Implement a small script (Python or Bash) to read the leads CSV and generated messages. It can either send emails directly via an SMTP relay (if compliant) or queue them for manual review. Include follow-up scheduling logic (e.g. reminders if no reply after X days).
+
+Logging: Track outreach status per lead (emailed, replied, interested, etc.) back into your SQLite store. This closes the loop and prevents duplicate outreach.
+
+Ideal Free/Open Stack
+
+Search Scraping: Use duckduckgo-search or serpapi-style tools to find leads by pain-point keywords.
+
+Contact Scraping: Use Playwright + BeautifulSoup for reliable site crawling and email extraction.
+
+Enrichment: Already-installed Upgini for data enrichment (lead scoring and firmographics). Supplement with free datasets: OpenSanctions, Clearbit open API, Crunchbase open dataset.
+
+Auditing: Use npx lighthouse (bundled in package.json) for site audits (performance, SEO, etc.).
+
+Data Handling: Use pandas for processing results and sqlite for storing leads, enrichment, and audit data.
+
+Workflow Automation: Glue these with Bash/Python scripts (as scaffolding is in place). For example, use repo_clean.sh to reset outputs, then run email_to_urls.sh, then run.sh, then main.py, then the outreach script.
+
+Existing Pipeline Components
+
+You already have a modular CI-MAS pipeline scaffold:
+
+email_to_urls.sh: Converts a raw contacts CSV into a filtered outputs/urls.txt of business domains (filters out freemail and validates DNS).
+
+run.sh: Iterates through configs/domains.txt, running Lighthouse on each domain and saving JSON/HTML to outputs/lighthouse.
+
+main.py: Parses those Lighthouse JSON reports into structured CSV rows (extracting performance, SEO, accessibility, LCP, CLS, INP, etc.). Outputs outputs/csv/results.csv.
+
+repo_clean.sh: Clears caches and previous outputs to start fresh.
+
+Config Files: lh.config.json, package.json, and requirements.txt define your Node and Python dependencies. These ensure Lighthouse, Playwright, Upgini, pandas, etc. are installed.
+
+Together, the above forms a complete pipeline: Lead URLs → Site Audits → CSV Enrichment → Outreach. Assemble the pieces with clear data flow (for example, pipeline order: discovery → enrichment → audit → outreach) to fully automate your lead generation and outreach process.
+
+
+AI INTRODUCTION:
+
+Your hardware (Ryzen 5 5500 CPU, 16 GB RAM, AMD RX 6500 XT GPU running Linux Mint 22.2) is more than capable of hosting small local agents. Below are some lightweight, open‑source agent frameworks that can fit into your lead‑generation pipeline, along with how you could integrate them and the schema considerations:
+
+Recommended Agent Frameworks
+
+CrewAI – a Python library built on LangChain for orchestrating multiple LLM‑powered agents with clearly defined roles and tasks. It allows you to create agents for lead discovery, enrichment, auditing and outreach and coordinate them via a shared memory and message bus. CrewAI is modular and supports either cloud‑hosted LLMs or local models (e.g. Llama‑2 via llama-cpp), so it can run on your machine.
+
+AutoGen (Microsoft) – a framework for creating conversational agents that collaborate with each other. It supports function calling and can chain tools (e.g. search, scraping, enrichment) in a conversational loop. AutoGen is lightweight and open‑source; you can define custom agents for scraping, enrichment and scoring.
+
+LangChain Agents – LangChain provides an “agent” abstraction that routes tasks through tools (web search, API calls, Python functions) based on natural‑language instructions. You can define a custom agent that uses duckduckgo-search, Playwright, Upgini and your Lighthouse scripts as tools, and feed it a JSON schema describing your lead entity.
+
+Scrapy + Playwright – although not marketed as an “agent”, Scrapy combined with Playwright can operate as a headless browser bot. You can run it locally to search for target sites using your pain‑point keywords and scrape contact information. This is robust, mature and light on resources.
+
+Integrating Them (“git them in”)
+
+Clone the frameworks – Each of the above has a public GitHub repository. For example, to bring CrewAI into your project you would run:
+
+cd ~/your-project-dir
+git clone https://github.com/your-org/crewai.git     # or the official repo URL
+cd crewai
+pip install -e .
+
+
+Repeat for AutoGen or any others. Keep them in a agents/ folder in your repo to keep things organised.
+
+Define a schema – Use your existing JSON schema (for example, the lead‑scoring schema you’ve been developing) as the contract between agents. Each agent should accept and return data conforming to this schema. For instance, a “DiscoveryAgent” could output {"domain": "...", "company_name": "...", "snippet": "..."}, which then feeds into an “EnrichmentAgent” that augments it with Upgini fields.
+
+Set up roles and tasks – For CrewAI or LangChain, define separate roles (e.g. DiscoveryAgent, EnrichmentAgent, AuditAgent, OutreachAgent) and register tools corresponding to your scripts (duckduckgo-search, playwright_scrape, lighthouse_audit, send_email). Configure them to communicate through your schema so each knows what fields to expect/produce.
+
+Adhere to your “laws” – When writing agents, enforce your framework’s six principles (respect robots.txt, no scraping of private data, proper API rate‑limiting, compliance with GDPR/CCPA, mobile‑first performance thresholds, and continuous self‑evaluation). This can be encoded in a .agent_policy.json file that each agent reads at start‑up and uses to refuse tasks that violate your guidelines.
+
+Self‑evaluation loop – Incorporate a self‑eval step (similar to your current automation loop) where after each agent completes its task, a small QA bot checks the output against the schema and law constraints. If it fails, a “RefinementAgent” can attempt to fix the issues or flag them for human review.
+
+By cloning these frameworks and binding them to your lead‑gen schema, you can build a modular, locally hosted agentic system that runs well on your hardware and remains compliant with your legal and ethical guidelines.
+
+
+Automated Outreach Pipeline Blueprint
+
+Efficient B2B lead generation can be achieved by automating the stages of lead discovery, data enrichment, website auditing, and personalized outreach. The following blueprint outlines each phase and the recommended open/free tools to integrate. It builds upon your existing scripts and config files to structure a CI-MAS (Continuous Integration – Marketing Automation System) pipeline.
+
+Phase 1: Lead Discovery (Web Scraping Search Results)
+
+Keyword-based search: Use search APIs or scrapers (e.g. Python’s duckduckgo-search or Google Search with rotation) to find businesses matching pain-point keywords. These tools query search engines for relevant companies, capturing domain, name, and snippets. DuckDuckGo’s Python library enables text and news searches out of the box
+pypi.org
+.
+
+Lead scraping: Automate collection of contact data (emails, names, phone numbers, addresses) from web pages. Lead scraping is the process of crawling websites to extract contact info at scale
+scrapingdog.com
+. For example, you might scrape industry directories (Yelp, LinkedIn, etc.) or search results to build an initial domains.txt list.
+
+Domain extraction: Convert company names to domains when needed. Clearbit’s Name-to-Domain API can take a company name and return its website domain (free for up to 50k lookups/month)
+clearbit.com
+. Use it to seed valid business domains from partial data.
+
+Phase 2: Data Enrichment
+
+External data sources: Enrich your lead list with additional data (size, industry, location, social links, etc.) before outreach. Use APIs like Upgini (a federated data search engine), OpenSanctions, Clearbit, and Crunchbase. Upgini connects over 50 public and 150+ premium data sources for federated enrichment, cleaning, and new feature generation
+upgini.com
+. OpenSanctions provides open data on sanctions and politically exposed persons (to filter or vet contacts)
+github.com
+.
+
+Firmographics & funding: Leverage Crunchbase for firmographic data. Crunchbase’s API offers real-time company data on millions of startups and enterprises (funding, revenue, employee count, etc.) for CRM enrichment
+data.crunchbase.com
+. Clearbit can also enrich records (domain, logo, tech stack) after you obtain domains
+clearbit.com
+.
+
+Database: Store and query leads locally using SQLite or CSVs. Keep track of which leads have been contacted. Enriched fields (industry, revenue, LinkedIn, etc.) help personalize messaging and qualify prospects.
+
+Phase 3: Website Auditing
+
+Lighthouse audits: Run automated site audits to gather Core Web Vitals and performance metrics. Tools like npx lighthouse (the Node CLI) can crawl each domain in domains.txt and output JSON/HTML reports. Lighthouse is an open-source web-quality audit tool from Google Chrome that measures metrics like Largest Contentful Paint, Cumulative Layout Shift, Total Blocking Time, etc.
+web.dev
+web.dev
+. These metrics give insight into a company’s website health.
+
+CI automation: Integrate run.sh to sequentially audit all domains, saving results. Your existing pipeline (run.sh, main.py) already parses these reports into CSVs (collecting the key scores). Use Pandas to aggregate and score the results. Identify prospects with high-need (e.g. low-performing sites) for prioritized outreach.
+
+Phase 4: Outreach Automation
+
+Message generation: Build personalized email drafts automatically. You can use templates or an LLM (like ChatGPT/GPT-4) to write tailored messages based on the prospect’s data and pain points. For example, one approach is to scrape a company’s landing page text and feed it to GPT to highlight selling points and draft emails
+medium.com
+. This greatly speeds up cold-email personalization.
+
+Email sequencing: Use Python (e.g. smtplib or an email API like SendGrid/Resend) to queue and send emails. Ensure compliance by reviewing messages before sending. Automate follow-ups by scheduling reminder emails. Track replies and calls (either manually or via simple CRM logic).
+
+Core Tools & Tech Stack
+
+Search/lead scraping: duckduckgo-search (Python package) or Google Search APIs – to programmatically retrieve search results
+pypi.org
+scrapingdog.com
+.
+
+Browser automation: Playwright (with Python) for dynamic websites. Playwright automates real browsers (Chrome/Firefox) and easily handles JavaScript-heavy pages, making it ideal for scraping contact pages
+scrapfly.io
+. Combine it with BeautifulSoup for HTML parsing (to extract emails or contact form URLs).
+
+Enrichment APIs: Upgini (Python library, pre-installed), OpenSanctions, Clearbit, Crunchbase (their REST APIs) for appending firmographic data.
+
+Website audit: npx lighthouse (Node CLI) to generate performance reports as JSON.
+
+Data processing: Pandas (Python) to merge CSVs of audits and enrichment data, compute lead scores.
+
+Storage: SQLite or CSV for lead lists and results. A lightweight local database helps manage state across runs.
+
+Each component can run headless in scripts, forming a modular pipeline: Search → Scrape → Enrich → Audit → Score → Email. The cited sources illustrate key tools: DuckDuckGo search API for querying
+pypi.org
+, up-to-date web-audit metrics from Lighthouse
+web.dev
+web.dev
+, and LLM-driven outreach examples
+medium.com
+. Integrating these steps as described will produce a robust, mostly open-source solution for finding prospects, evaluating their needs (via site audits), and automating cold outreach.
+
+Sources: Authoritative docs and blogs on web scraping and marketing tools have been used to verify tool capabilities
+pypi.org
+scrapingdog.com
+web.dev
+web.dev
+scrapfly.io
+upgini.com
+github.com
+clearbit.com
+data.crunchbase.com
+medium.com
+. These confirm the approaches and technologies recommended above.
+
+Sources: Upgini marketing material
+upgini.com
+ and Google Lighthouse docs
+developer.chrome.com
+ (for tool descriptions).
