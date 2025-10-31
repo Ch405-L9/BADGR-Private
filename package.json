@@ -1,1 +1,0 @@
-{"name":"badgr_bot","private":true,"version":"0.1.0","description":"Local token-free CI-MAS","scripts":{"lh":"lighthouse --quiet --output=json --output-path=stdout","prepare":"playwright install --with-deps || true"},"devDependencies":{"lighthouse":"^12.0.0"}}
