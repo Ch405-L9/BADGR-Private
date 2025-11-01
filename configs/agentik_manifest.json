@@ -1,0 +1,125 @@
+{
+  "agentik_manifest_version": "1.0.0",
+  "timestamp_utc": "REPLACE_WITH_UTC_ISO",
+  "project": "Agentik LeadGen-Audit",
+  "manifest_links": {
+    "pipeline_manifest_yaml": "configs/manifest.yaml",
+    "notes_file": "NOTES.txt",
+    "shn_dir": "outputs/shn"
+  },
+
+  "laws_and_guardrails": {
+    "context_markers": {
+      "inside_venv": "🟢 [inside venv]",
+      "outside_venv": "🔵 [outside venv]"
+    },
+    "execution_principles": [
+      "One step at a time (no parallel leaps).",
+      "venv-first for any Python task; always mark run context explicitly.",
+      "Explicit notice when something runs outside venv.",
+      "Structured logging: stdout reserved for machine-readable results; stderr for logs.",
+      "Manual actions that pass are promoted to automated pipeline stages.",
+      "Respect robots.txt and rate limits; provider fallbacks and exponential backoff are mandatory.",
+      "Never store or print secrets; environment variables only; fail if secrets detected."
+    ],
+    "git_protocol": {
+      "rule": "If user says 'Push to git', first run guardrail checks; only push if all pass.",
+      "checks": [
+        "Detect if current dir is a git repo: git rev-parse --is-inside-work-tree",
+        "If not a repo: git init; git remote add origin <REMOTE>",
+        "Verify origin URL matches expected; else git remote set-url origin <REMOTE>",
+        "Secret scan (fail if any): use git-secrets or ripgrep for common key patterns",
+        "Repo size check; recommend .gitignore / Git LFS for large binaries (e.g., reports, jars)",
+        "Handle remote default files (README, LICENSE): fetch and rebase or push to a new version branch",
+        "Confirm target branch (Agentik_v#); create if missing",
+        "Dry-run commit + show status; then push with -u origin <branch>"
+      ]
+    }
+  },
+
+  "repo_and_remote": {
+    "primary_remote": "https://github.com/Ch405-L9/BADGR-Private.git",
+    "default_branch": "Agentik_v1",
+    "version_branches": [
+      "Agentik_v2","Agentik_v3","Agentik_v4","Agentik_v5","Agentik_v6","Agentik_v7","Agentik_v8","Agentik_v9"
+    ]
+  },
+
+  "phase_state": {
+    "phase_1_setup_preflight": {
+      "status": "green",
+      "evidence": "scripts/precheck.py -> {\"ok\": true, \"checks\": [{\"cmds_missing\": []}], \"cfg_ok\": true}"
+    },
+    "phase_2_discovery": {
+      "status": "pending (script not created yet)",
+      "inputs_ready": ["configs/manifest.yaml (keywords/providers present)"],
+      "seed_domains_present": true,
+      "seed_file": "configs/domains.txt"
+    },
+    "phase_3_scrape_audit_sanity": {
+      "status": "green",
+      "actions_performed": [
+        "Lighthouse audits run for example.com, web.dev (perf preset + mobile emulation flags)",
+        "src/main.py compiled outputs/lighthouse/*.json -> outputs/csv/results.csv"
+      ],
+      "artifacts": [
+        "outputs/lighthouse/*.report.json",
+        "outputs/csv/results.csv"
+      ]
+    },
+    "phase_4_enrichment": { "status": "not started" },
+    "phase_5_persist_db": { "status": "not started (CSV present)" },
+    "phase_6_audit": { "status": "validated via manual Lighthouse loop" },
+    "phase_7_score": { "status": "not started" },
+    "phase_8_report": { "status": "not started" }
+  },
+
+  "automation_map": [
+    { "phase": "Discovery",    "manual_now": "scripts/discover.py (up next)",       "automated_later": "Called by scripts/staged_run.sh after pre-flight", "trigger": "scripts/staged_run.sh" },
+    { "phase": "Scrape",       "manual_now": "src/scrape_agent.py or src/main.py",  "automated_later": "Auto after discovery",                               "trigger": "scripts/staged_run.sh" },
+    { "phase": "Audit",        "manual_now": "Lighthouse loop executed manually",   "automated_later": "Auto after scrape",                                  "trigger": "scripts/staged_run.sh" },
+    { "phase": "Compile/Score","manual_now": "python src/main.py",                  "automated_later": "Auto after audit",                                   "trigger": "scripts/staged_run.sh" }
+  ],
+
+  "next_steps_prescribed": [
+    {
+      "step_id": "DISC-001",
+      "title": "Create discovery script",
+      "description": "Implement scripts/discover.py to read keywords/providers from configs/manifest.yaml, query Google CSE if keys exist or DDG fallback, normalize & dedupe domains, and write configs/domains.txt.",
+      "run_context": "🟢 [inside venv]",
+      "acceptance_criteria": [
+        "configs/domains.txt re-generated from keywords",
+        "Provider used and RPS logged; rate limit respected",
+        "Idempotent output; no duplicates; normalized hostnames"
+      ]
+    },
+    {
+      "step_id": "AUD-PIPE-GLUE-002",
+      "title": "Wire audit automation",
+      "description": "Move the validated Lighthouse loop into scripts/staged_run.sh (audit stage) and make it consume configs/domains.txt and emit outputs/lighthouse/*.json.",
+      "run_context": "🔵 [outside venv] (Node/Lighthouse), callable from venv safely",
+      "acceptance_criteria": [
+        "Audit runs via staged_run.sh without manual loop",
+        "JSON files emitted to outputs/lighthouse/",
+        "Exit codes bubble up; structured logs captured"
+      ]
+    },
+    {
+      "step_id": "COMPILE-003",
+      "title": "Auto-compile JSON -> CSV in pipeline",
+      "description": "Invoke python src/main.py automatically after audit stage; pathing via BADGR_BASE, OUT_CSV.",
+      "run_context": "🟢 [inside venv]",
+      "acceptance_criteria": [
+        "outputs/csv/results.csv produced without manual call",
+        "Headers and values match current manual CSV"
+      ]
+    }
+  ],
+
+  "readme_updates_suggested": [
+    "Add 'Testing Ritual': (1) 🟢 [inside venv] source .venv/bin/activate, (2) run the requested test, (3) stdout vs stderr discipline.",
+    "Add legend for run context markers: 🟢 [inside venv], 🔵 [outside venv].",
+    "Document discovery → scrape → audit → compile flow with env vars (BADGR_BASE, OUT_CSV).",
+    "Security: secrets via env only; rotate keys on detection."
+  ]
+}

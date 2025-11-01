@@ -1,0 +1,248 @@
+{
+  "shn_version": "1.0.0",
+  "doc_type": "SHN-FULL",
+  "collected_at_utc": "2025-10-31T00:00:00Z",
+  "collected_at_local": "2025-10-31T00:00:00-04:00",
+  "project": {
+    "name": "Agentik LeadGen-Audit",
+    "pipeline": "Discover → Scrape → Enrich → Audit → Score → (Outreach optional)"
+  },
+  "phase": {
+    "code": "DISC-001",
+    "name": "Discovery – design & implementation",
+    "status": "in-progress",
+    "summary": "Design approved; discovery script implemented with providers, rate limiting, quotas, backoff, robots/crawl-delay, structured logging; unit & mocked integration tests provided; awaiting run & iteration."
+  },
+  "scope_of_this_build": {
+    "goal": "Implement discovery layer that safely gathers candidate domains from search providers using mobile-first, audit-friendly constraints.",
+    "deliverables": [
+      "scripts/discover.py (production-ready CLI)",
+      "tests/test_discover.py (unit tests)",
+      "tests/test_integration_discover.py (mocked integration tests)"
+    ],
+    "non_goals": [
+      "README/Docs updates (deferred)",
+      "Downstream audit runner changes (out of scope here)",
+      "Outreach/email drafting (out of scope)"
+    ]
+  },
+  "inputs": {
+    "keywords": [
+      "slow website mobile performance",
+      "seo issues site audit",
+      "improve LCP CLS INP web vitals"
+    ],
+    "config_schema_additions": {
+      "providers.google_cse": {
+        "enabled": true,
+        "api_key_env": "GOOGLE_API_KEY",
+        "cx_env": "GOOGLE_CSE_ID",
+        "rate_limit_rps": 0.5,
+        "daily_quota_threshold": 90,
+        "retry_attempts": 3,
+        "backoff_base_seconds": 0.5,
+        "backoff_max_seconds": 8,
+        "jitter_percent": 20
+      },
+      "providers.duckduckgo": {
+        "enabled": true,
+        "method": "scrape",
+        "rate_limit_rps": 0.3,
+        "retry_attempts": 3,
+        "backoff_base_seconds": 1,
+        "backoff_max_seconds": 8,
+        "jitter_percent": 20
+      },
+      "output": {
+        "domains_txt": "configs/domains.txt",
+        "overwrite": true
+      },
+      "logging": {
+        "level": "info",
+        "structured": true,
+        "user_agent": "Agentik-LeadGen-Discover/1.0 (+https://github.com/Ch405-L9/BADGR-Private)"
+      }
+    },
+    "env_vars_required": [
+      "GOOGLE_API_KEY",
+      "GOOGLE_CSE_ID"
+    ]
+  },
+  "governance_compliance": {
+    "laws": [
+      "Respect robots.txt",
+      "No private/login-wall scraping",
+      "Enforce rate limiting/backoff",
+      "GDPR/CCPA lawful basis (Legitimate Interest)",
+      "Mobile-first performance thresholds (used later in Audit)",
+      "Self-evaluation & QC"
+    ],
+    "auditability_fields": [
+      "collected_at",
+      "provider",
+      "keyword",
+      "queries_made",
+      "domains_returned",
+      "delay_used",
+      "fallback",
+      "error_code",
+      "robots_respected",
+      "crawl_delay",
+      "summary: provider_usage"
+    ],
+    "pii_restrictions": "Skip freemails; do not collect private emails; no auth bypass.",
+    "security_notes": "Env vars for secrets; polite rate limits; no bulk PII storage beyond lawful scope."
+  },
+  "artifacts_paths": {
+    "domains_txt": "configs/domains.txt",
+    "contacts_csv": "outputs/csv/contacts.csv",
+    "results_csv": "outputs/csv/results.csv",
+    "sqlite_db": "outputs/leadgen.db",
+    "logs_destination": "stdout (JSON structured)"
+  },
+  "delivered_code": {
+    "scripts/discover.py": {
+      "what_it_is": "CLI discovery runner with providers (Google CSE, DuckDuckGo), rate-limiter, quotas, backoff, robots/crawl-delay, max-results, structured JSON logging, summary stats.",
+      "what_it_does": "For each keyword, query providers safely; collect URLs; normalize → domain; dedupe & sort; write to domains file; emit audit-ready logs and a usage summary."
+    },
+    "tests/test_discover.py": {
+      "what_it_is": "Unit tests for core logic (limiter, normalization, backoff, crawl-delay parse).",
+      "what_it_does": "Validate non-network primitives behave deterministically to avoid regressions."
+    },
+    "tests/test_integration_discover.py": {
+      "what_it_is": "Mocked integration tests for provider flows, retries, and quotas.",
+      "what_it_does": "Simulate Google 429→200 retry, DDG happy path, and quota stop conditions."
+    }
+  },
+  "runtime_logic_highlights": {
+    "rate_limiting": "RPS → sleep interval, with ±jitter% to avoid request bursts.",
+    "retries_backoff": "On 429/503/timeout: exponential backoff 0.5→1→2→4→8s (capped).",
+    "quotas": "Per-provider daily_quota_threshold; stop using provider when reached.",
+    "robots_and_crawl_delay": "Fetch DDG robots.txt once; parse Crawl-delay; enforce before queries; mark robots_respected=true in logs.",
+    "max_results": "Per keyword, per provider limit; overall output is deduped domains.",
+    "logging": "Structured JSON to stdout with collected_at, provider, keyword, counts, delays, errors, and final provider_usage summary."
+  },
+  "how_to_run": {
+    "command": "python scripts/discover.py --config configs/manifest.yaml --output configs/domains.txt --provider all --max-results 25 --verbose",
+    "prereqs": [
+      "pip install -r requirements.txt",
+      "Set GOOGLE_API_KEY & GOOGLE_CSE_ID"
+    ],
+    "expected_outputs": [
+      "configs/domains.txt (deduped, sorted domains)",
+      "JSON logs on stdout (query events + summary)"
+    ]
+  },
+  "status_board": {
+    "design": "approved",
+    "implementation": {
+      "google_cse": "implemented",
+      "duckduckgo": "implemented (ddgs lib + robots/crawl-delay)",
+      "rate_limit_jitter": "implemented",
+      "backoff": "implemented",
+      "quotas": "implemented",
+      "max_results": "implemented",
+      "structured_logging": "implemented"
+    },
+    "testing": {
+      "unit": "ready (tests/test_discover.py)",
+      "integration_mocked": "ready (tests/test_integration_discover.py)",
+      "manual_run": "pending",
+      "qa_refinement": "pending"
+    },
+    "docs_readme": "deferred until functionality validated"
+  },
+  "navigation_next_steps": [
+    {
+      "id": "DISC-001.R1",
+      "task": "Manual smoke test with a small keyword set",
+      "actions": [
+        "Export GOOGLE_API_KEY/GOOGLE_CSE_ID",
+        "Run discovery CLI (provider=all, max-results=10–25)",
+        "Inspect structured logs for fallback/quotes/backoff events",
+        "Review configs/domains.txt for dedupe and relevance"
+      ],
+      "owner": "Engineer",
+      "done_when": "Domains file populated; logs show no unhandled errors; quotas respected."
+    },
+    {
+      "id": "DISC-001.R2",
+      "task": "QA pass & thresholds tune",
+      "actions": [
+        "Simulate 429 bursts to confirm backoff and fallback",
+        "Temporarily set daily_quota_threshold small to verify cutoff",
+        "Adjust rate_limit_rps/backoff_base_seconds if needed"
+      ],
+      "owner": "QA",
+      "done_when": "No provider overuse; predictable, compliant pacing."
+    },
+    {
+      "id": "DISC-001.R3",
+      "task": "Promote to pipeline",
+      "actions": [
+        "Wire into staged_run.sh / one_shot flow",
+        "Commit & tag (Agentik_v1)",
+        "Archive SHN-FULL with build stamp"
+      ],
+      "owner": "Engineer",
+      "done_when": "Discovery is invoked automatically ahead of Scrape/Audit."
+    }
+  ],
+  "current_activity": {
+    "state": "Ready for manual run",
+    "notes": "Local environment keys required before first real hit; tests can run without network due to mocks."
+  },
+  "acceptance_criteria": [
+    "Domains file is deterministic (sorted, deduped) given the same inputs.",
+    "Rate limiting & jitter are evident in logs; no rapid-fire bursts.",
+    "429/503/timeouts trigger exponential backoff; retries stop at cap.",
+    "Provider fallback triggers clearly marked with fallback=true in logs.",
+    "Quota stop behavior: further queries are skipped for that provider.",
+    "Robots/Crawl-delay respected for DDG; crawl_delay recorded in logs."
+  ],
+  "risks_and_mitigations": [
+    {
+      "risk": "Google CSE quota exhaustion or key misconfiguration",
+      "mitigation": "Fallback to DDG; visible errors in logs; set non-zero daily_quota_threshold; alert on zero results."
+    },
+    {
+      "risk": "DDG library changes or network blocks",
+      "mitigation": "Conservative rate limits; robots/crawl-delay compliance; retries with capped backoff."
+    },
+    {
+      "risk": "Noisy or low-signal domains",
+      "mitigation": "Tighten keywords; post-filter by TLD, language, or sector; manual spot checks."
+    }
+  ],
+  "telemetry_fields_emitted": [
+    "timestamp",
+    "level",
+    "message",
+    "provider",
+    "keyword",
+    "collected_at",
+    "delay_used",
+    "domains_returned",
+    "error_code",
+    "fallback",
+    "queries_made",
+    "robots_respected",
+    "crawl_delay",
+    "summary.provider_usage"
+  ],
+  "rollforward_strategy": "Iterate provider weights and max-results by keyword after first manual run.",
+  "rollback_strategy": "Disable Google (provider=duckduckgo) or set daily_quota_threshold=0 for a provider; revert to prior tag.",
+  "ownership": {
+    "design_owner": "You",
+    "impl_owner": "Assistant (this build)",
+    "qa_owner": "You/QA",
+    "ops_owner": "You/DevOps"
+  },
+  "changelog": [
+    {
+      "when": "2025-10-31",
+      "what": "Added discovery implementation with GoogleCSEProvider & DuckDuckGoProvider; added quotas, backoff, robots/crawl-delay; structured logs; tests.",
+      "who": "Assistant"
+    }
+  ]
+}

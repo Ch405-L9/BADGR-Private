@@ -1,0 +1,17 @@
+{
+  "python": {
+    "min": "3.8",
+    "recommended": "3.10"
+  },
+  "deps": {
+    "pydantic": {
+      "critical": ">=2.0"
+    },
+    "playwright": {
+      "critical": ">=1.48"
+    },
+    "requests": {
+      "optional": ">=2.25.0"
+    }
+  }
+}

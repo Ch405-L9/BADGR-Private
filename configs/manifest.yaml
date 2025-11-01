@@ -1,0 +1,54 @@
+# Agentik Discovery Configuration
+# This file configures the discovery phase with keywords and search providers
+
+keywords:
+  - "atlanta web design"
+  - "accessibility audit"
+  - "lighthouse performance"
+
+providers:
+  google_cse:
+    enabled: true
+    api_key_env: "GOOGLE_API_KEY"
+    cx_env: "GOOGLE_CSE_ID"
+    rate_limit_rps: 1.0
+    jitter_percent: 20
+    retry_attempts: 3
+    backoff_base_seconds: 0.5
+    backoff_max_seconds: 8.0
+    daily_quota_threshold: 100
+
+  duckduckgo:
+    enabled: true
+    method: "scrape"
+    rate_limit_rps: 0.5
+    jitter_percent: 20
+    retry_attempts: 3
+    backoff_base_seconds: 0.5
+    backoff_max_seconds: 8.0
+    daily_quota_threshold: 100
+
+
+
+# --- GOVERNANCE / LAWS (added by assistant) ---
+governance:
+  laws:
+    - "Respect robots.txt"
+    - "No private/login-wall scraping"
+    - "Enforce rate limiting/backoff"
+    - "GDPR/CCPA (Legitimate Interest)"
+    - "Mobile-first thresholds (CWV)"
+    - "Continuous self-evaluation & QC"
+  auditability_fields:
+    - collected_at
+    - provider
+    - keyword
+    - queries_made
+    - domains_returned
+    - delay_used
+    - robots_respected
+    - crawl_delay
+# --- end governance ---
+
+
+  - "Self-evaluation"

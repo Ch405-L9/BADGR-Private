@@ -1,0 +1,8 @@
+.env
+*.env
+*test*.py
+*test*.txt
+Give_to_engineer*
+ENV-corrected.txt
+Terminal-Problems.txt
+PROBLEMS.txt
