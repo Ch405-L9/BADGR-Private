@@ -49,6 +49,3 @@ governance:
     - robots_respected
     - crawl_delay
 # --- end governance ---
-
-
-  - "Self-evaluation"

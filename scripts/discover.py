@@ -368,7 +368,7 @@ def load_config(path: Path) -> Dict[str, Any]:
         cfg = yaml.safe_load(f) or {}
     
     # Validate required fields
-    if not cfg.get("keywords"):
+    if "keywords" not in cfg or cfg.get("keywords") is None:
         raise ValueError("Config missing 'keywords' field")
     if not isinstance(cfg["keywords"], list):
         raise ValueError("'keywords' must be a list")

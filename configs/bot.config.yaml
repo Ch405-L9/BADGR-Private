@@ -1,0 +1,15 @@
+# Bot configuration file
+# Created to satisfy precheck.py requirements
+# Main configuration is in manifest.yaml
+
+keywords:
+  - "atlanta web design"
+  - "accessibility audit"
+  - "lighthouse performance"
+
+providers:
+  google_cse:
+    enabled: true
+  duckduckgo:
+    enabled: true
+

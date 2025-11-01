@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT_DIR="/home/t0n34781/badgr_bot"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${ROOT_DIR}/outputs/lighthouse"
 CSV_DIR="${ROOT_DIR}/outputs/csv"
 CONF_DOMAINS="${ROOT_DIR}/configs/domains.txt"

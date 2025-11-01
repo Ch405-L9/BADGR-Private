@@ -1,2 +1,5 @@
-example.com
-web.dev
+accessible.org
+afixt.com
+interaction-design.org
+know-the-ada.com
+pivotalaccessibility.com
